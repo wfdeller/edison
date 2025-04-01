@@ -3,11 +3,14 @@ const AuditLog = require('../models/Audit');
 class AuditService {
     async logChange(data) {
         try {
+            console.log('Attempting to create audit log with data:', JSON.stringify(data, null, 2));
             const auditLog = new AuditLog(data);
-            await auditLog.save();
-            return auditLog;
+            const savedLog = await auditLog.save();
+            console.log('Successfully created audit log:', savedLog._id);
+            return savedLog;
         } catch (error) {
             console.error('Error creating audit log:', error);
+            console.error('Failed audit data:', JSON.stringify(data, null, 2));
             // Don't throw the error to prevent disrupting the main operation
             return null;
         }

@@ -24,30 +24,9 @@ const useSettingsStore = create((set, get) => ({
                 },
             });
 
-            const settingsArray = response.data;
-            console.log('SettingsStore: Raw settings array:', settingsArray);
-
-            // Transform array of settings into nested object structure
-            const formattedSettings = {
-                general: {},
-                security: {},
-                authentication: {},
-                appearance: {},
-            };
-
-            settingsArray.forEach(setting => {
-                const category = setting.category;
-                const key = setting.key;
-                const value = setting.value;
-
-                if (formattedSettings[category]) {
-                    formattedSettings[category][key] = value;
-                }
-            });
-
-            console.log('SettingsStore: Formatted settings:', formattedSettings);
-            set({ settings: formattedSettings, loading: false });
-            return formattedSettings;
+            console.log('SettingsStore: Raw settings:', response.data);
+            set({ settings: response.data, loading: false });
+            return response.data;
         } catch (error) {
             console.error('SettingsStore: Error fetching settings:', error);
             console.error('SettingsStore: Error details:', {
@@ -71,21 +50,12 @@ const useSettingsStore = create((set, get) => ({
                 throw new Error('Not authenticated');
             }
 
-            // Transform the nested data structure back to flat structure for the API
-            const apiData = {
-                siteName: updateData.general?.siteName,
-                siteDescription: updateData.general?.siteDescription,
-                contactEmail: updateData.general?.contactEmail,
-                maintenanceMode: updateData.general?.maintenanceMode,
-                analyticsEnabled: updateData.general?.analyticsEnabled,
-                maxUploadSize: updateData.security?.maxUploadSize,
-                allowedVideoTypes: updateData.security?.allowedVideoTypes,
-                maxVideoDuration: updateData.security?.maxVideoDuration,
-                allowRegistration: updateData.authentication?.allowRegistration,
-                requireEmailVerification: updateData.authentication?.requireEmailVerification,
-                theme: updateData.appearance?.theme,
-                primaryColor: updateData.appearance?.primaryColor,
-            };
+            // Transform the form data into the API format
+            const apiData = updateData.map(category => ({
+                category: category.category,
+                key: category.key,
+                value: category.value,
+            }));
 
             console.log('SettingsStore: Sending API data:', apiData);
 
@@ -95,60 +65,10 @@ const useSettingsStore = create((set, get) => ({
                     'Content-Type': 'application/json',
                 },
             });
+
             console.log('SettingsStore: Update response:', response.data);
-
-            // Get the actual settings object, handling both direct and nested responses
-            const settingsData = response.data.settings || response.data;
-
-            // Transform the response data back to the form structure
-            const formattedSettings = {
-                general: {
-                    siteName: settingsData.siteName || settingsData.general?.siteName || '',
-                    siteDescription:
-                        settingsData.siteDescription || settingsData.general?.siteDescription || '',
-                    contactEmail:
-                        settingsData.contactEmail || settingsData.general?.contactEmail || '',
-                    maintenanceMode:
-                        settingsData.maintenanceMode ||
-                        settingsData.general?.maintenanceMode ||
-                        false,
-                    analyticsEnabled:
-                        settingsData.analyticsEnabled ||
-                        settingsData.general?.analyticsEnabled ||
-                        false,
-                },
-                security: {
-                    maxUploadSize:
-                        settingsData.maxUploadSize || settingsData.security?.maxUploadSize || 100,
-                    allowedVideoTypes: settingsData.allowedVideoTypes ||
-                        settingsData.security?.allowedVideoTypes || ['mp4'],
-                    maxVideoDuration:
-                        settingsData.maxVideoDuration ||
-                        settingsData.security?.maxVideoDuration ||
-                        3600,
-                },
-                authentication: {
-                    allowRegistration:
-                        settingsData.allowRegistration ||
-                        settingsData.authentication?.allowRegistration ||
-                        false,
-                    requireEmailVerification:
-                        settingsData.requireEmailVerification ||
-                        settingsData.authentication?.requireEmailVerification ||
-                        false,
-                },
-                appearance: {
-                    theme: settingsData.theme || settingsData.appearance?.theme || 'light',
-                    primaryColor:
-                        settingsData.primaryColor ||
-                        settingsData.appearance?.primaryColor ||
-                        '#1890ff',
-                },
-            };
-
-            console.log('SettingsStore: Updated formatted settings:', formattedSettings);
-            set({ settings: formattedSettings, loading: false });
-            return formattedSettings;
+            set({ settings: response.data, loading: false });
+            return response.data;
         } catch (error) {
             console.error('SettingsStore: Error updating settings:', error);
             console.error('SettingsStore: Error details:', {

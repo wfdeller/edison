@@ -26,13 +26,31 @@ const Settings = () => {
     useEffect(() => {
         if (settings) {
             console.log('Settings changed, updating form with:', settings);
-            form.setFieldsValue(settings);
+            // Transform settings array into form values
+            const formValues = settings.reduce((acc, setting) => {
+                if (!acc[setting.category]) {
+                    acc[setting.category] = {};
+                }
+                acc[setting.category][setting.key] = setting.value;
+                return acc;
+            }, {});
+            console.log('Setting form values:', formValues);
+            form.setFieldsValue(formValues);
         }
     }, [settings, form]);
 
     const handleSubmit = async values => {
         try {
-            await updateSettingsData(values);
+            console.log('Submitting values:', values);
+            // Transform form values back to settings array format
+            const settingsArray = Object.entries(values).flatMap(([category, categoryValues]) =>
+                Object.entries(categoryValues).map(([key, value]) => ({
+                    category,
+                    key,
+                    value,
+                }))
+            );
+            await updateSettingsData(settingsArray);
             message.success('Settings updated successfully');
         } catch (error) {
             console.error('Error updating settings:', error);
@@ -56,6 +74,19 @@ const Settings = () => {
         );
     }
 
+    // Group settings by category
+    const settingsByCategory =
+        settings?.reduce((acc, setting) => {
+            if (!acc[setting.category]) {
+                acc[setting.category] = [];
+            }
+            acc[setting.category].push(setting);
+            return acc;
+        }, {}) || {};
+
+    // Define the order of categories
+    const categoryOrder = ['general', 'authentication', 'security', 'appearance'];
+
     return (
         <div>
             <div
@@ -76,72 +107,57 @@ const Settings = () => {
                 form={form}
                 layout="vertical"
                 onFinish={handleSubmit}
-                initialValues={settings}
                 preserve={false}
+                initialValues={settings?.reduce((acc, setting) => {
+                    if (!acc[setting.category]) {
+                        acc[setting.category] = {};
+                    }
+                    acc[setting.category][setting.key] = setting.value;
+                    return acc;
+                }, {})}
             >
-                <Card title="General Settings">
-                    <Form.Item
-                        name={['general', 'siteName']}
-                        label="Site Name"
-                        rules={[{ required: true }]}
-                    >
-                        <Input />
-                    </Form.Item>
-                    <Form.Item name={['general', 'siteDescription']} label="Site Description">
-                        <Input.TextArea />
-                    </Form.Item>
-                    <Form.Item
-                        name={['general', 'contactEmail']}
-                        label="Contact Email"
-                        rules={[{ type: 'email' }]}
-                    >
-                        <Input />
-                    </Form.Item>
-                    <Form.Item
-                        name={['general', 'maintenanceMode']}
-                        label="Maintenance Mode"
-                        valuePropName="checked"
-                    >
-                        <Switch />
-                    </Form.Item>
-                </Card>
-
-                <Card title="Authentication Settings" style={{ marginTop: 16 }}>
-                    <Form.Item
-                        name={['authentication', 'allowRegistration']}
-                        label="Allow Registration"
-                        valuePropName="checked"
-                    >
-                        <Switch />
-                    </Form.Item>
-                    <Form.Item
-                        name={['authentication', 'requireEmailVerification']}
-                        label="Require Email Verification"
-                        valuePropName="checked"
-                    >
-                        <Switch />
-                    </Form.Item>
-                </Card>
-
-                <Card title="Appearance Settings" style={{ marginTop: 16 }}>
-                    <Form.Item
-                        name={['appearance', 'theme']}
-                        label="Theme"
-                        rules={[{ required: true }]}
-                    >
-                        <Select>
-                            <Select.Option value="light">Light</Select.Option>
-                            <Select.Option value="dark">Dark</Select.Option>
-                        </Select>
-                    </Form.Item>
-                    <Form.Item
-                        name={['appearance', 'primaryColor']}
-                        label="Primary Color"
-                        rules={[{ required: true }]}
-                    >
-                        <Input type="color" />
-                    </Form.Item>
-                </Card>
+                <Tabs
+                    items={categoryOrder.map(category => ({
+                        key: category,
+                        label: `${category.charAt(0).toUpperCase() + category.slice(1)} Settings`,
+                        children: (
+                            <Card>
+                                {settingsByCategory[category]?.map(setting => (
+                                    <Form.Item
+                                        key={`${category}-${setting.key}`}
+                                        name={[category, setting.key]}
+                                        label={setting.description || setting.key}
+                                        rules={setting.required ? [{ required: true }] : undefined}
+                                        valuePropName={
+                                            setting.type === 'boolean' ? 'checked' : undefined
+                                        }
+                                    >
+                                        {setting.type === 'boolean' ? (
+                                            <Switch />
+                                        ) : setting.type === 'select' ? (
+                                            <Select>
+                                                {setting.options?.map(option => (
+                                                    <Select.Option
+                                                        key={option.value}
+                                                        value={option.value}
+                                                    >
+                                                        {option.label}
+                                                    </Select.Option>
+                                                ))}
+                                            </Select>
+                                        ) : setting.type === 'color' ? (
+                                            <Input type="color" />
+                                        ) : setting.type === 'textarea' ? (
+                                            <Input.TextArea />
+                                        ) : (
+                                            <Input />
+                                        )}
+                                    </Form.Item>
+                                ))}
+                            </Card>
+                        ),
+                    }))}
+                />
             </Form>
         </div>
     );

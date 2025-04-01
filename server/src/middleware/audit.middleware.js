@@ -2,21 +2,6 @@ const auditService = require('../services/audit.service');
 
 function createAuditMiddleware(modelName) {
     return function auditMiddleware(req, res, next) {
-        // Store the original response methods
-        const originalJson = res.json;
-        const originalSend = res.send;
-
-        // Override response methods to capture the response
-        res.json = function (data) {
-            res.responseData = data;
-            return originalJson.call(this, data);
-        };
-
-        res.send = function (data) {
-            res.responseData = data;
-            return originalSend.call(this, data);
-        };
-
         // Get the request method and determine the operation
         const method = req.method;
         let operation;
@@ -35,42 +20,62 @@ function createAuditMiddleware(modelName) {
                 return next();
         }
 
-        // Get the document ID from the request
-        const documentId = req.params.id || (res.responseData && res.responseData._id);
+        // Store original response methods
+        const originalJson = res.json;
+        const originalSend = res.send;
 
-        // If no document ID is available, skip auditing
-        if (!documentId) {
-            return next();
-        }
-
-        // Get the request body and response data
-        const changes = {
-            before: req.method === 'POST' ? null : req.body,
-            after: res.responseData,
+        // Override response methods to capture the response
+        res.json = function (data) {
+            res.responseData = data;
+            return originalJson.call(this, data);
         };
 
-        // Get modified fields
-        const modifiedFields = Object.keys(changes.after || {}).filter(key => {
-            if (!changes.before) return true;
-            return JSON.stringify(changes.before[key]) !== JSON.stringify(changes.after[key]);
-        });
+        res.send = function (data) {
+            res.responseData = data;
+            return originalSend.call(this, data);
+        };
+
+        // Get the document ID from the request
+        const documentId = req.params.id || (req.body && req.body._id);
 
         // Create audit log entry
         const auditData = {
             model: modelName,
-            documentId,
+            documentId: documentId || 'unknown',
             operation,
-            changes,
-            modifiedFields,
+            changes: {
+                before: method === 'POST' ? null : req.body,
+                after: null, // Will be updated when response is sent
+            },
+            modifiedFields: method === 'POST' ? Object.keys(req.body) : Object.keys(req.body),
             user: req.user ? req.user._id : null,
             ip: req.ip,
             userAgent: req.get('user-agent'),
         };
 
-        // Log the change asynchronously
-        auditService.logChange(auditData).catch(error => {
-            console.error('Error creating audit log:', error);
-        });
+        // Store original end method
+        const originalEnd = res.end;
+        res.end = function (chunk, encoding, callback) {
+            // Update the audit data with the response
+            if (res.responseData) {
+                auditData.changes.after = res.responseData;
+                if (method !== 'POST') {
+                    auditData.modifiedFields = Object.keys(res.responseData).filter(key => {
+                        if (!req.body[key]) return true;
+                        return (
+                            JSON.stringify(req.body[key]) !== JSON.stringify(res.responseData[key])
+                        );
+                    });
+                }
+            }
+
+            // Log the change asynchronously
+            auditService.logChange(auditData).catch(error => {
+                console.error('Error creating audit log:', error);
+            });
+
+            return originalEnd.call(this, chunk, encoding, callback);
+        };
 
         next();
     };

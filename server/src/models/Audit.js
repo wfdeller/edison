@@ -8,7 +8,7 @@ const auditLogSchema = new mongoose.Schema(
             index: true,
         },
         documentId: {
-            type: mongoose.Schema.Types.ObjectId,
+            type: mongoose.Schema.Types.Mixed,
             required: true,
             index: true,
         },
@@ -30,15 +30,15 @@ const auditLogSchema = new mongoose.Schema(
         user: {
             type: mongoose.Schema.Types.ObjectId,
             ref: 'User',
-            required: true,
+            required: false,
         },
         ip: {
             type: String,
-            required: true,
+            required: false,
         },
         userAgent: {
             type: String,
-            required: true,
+            required: false,
         },
     },
     {

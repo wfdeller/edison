@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
-const auditController = require('./audit.controller');
-const { verifyToken, isAdmin } = require('../auth/auth.middleware');
+const auditController = require('../controllers/audit.controller');
+const { verifyToken, isAdmin } = require('../middleware/auth.middleware');
 
 // All audit routes require admin access
 router.use(verifyToken, isAdmin);
@@ -21,4 +21,4 @@ router.get('/date-range', auditController.getLogsByDateRange);
 // Clear audit logs (admin only)
 router.delete('/', auditController.clearLogs);
 
-module.exports = router; 
+module.exports = router;

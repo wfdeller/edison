@@ -5,15 +5,13 @@ import MainLayout from './components/layout/MainLayout';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import Videos from './pages/Videos';
+import Home from './pages/Home';
 import Dashboard from './pages/admin/Dashboard';
 import AdminUsers from './pages/admin/AdminUsers';
 import Settings from './pages/admin/Settings';
 import Profile from './pages/Profile';
 import useAuthStore from './stores/authStore';
 import ProtectedRoute from './components/auth/ProtectedRoute';
-
-// Placeholder components for other routes
-const Home = () => <div>Home Page</div>;
 
 const App = () => {
     const { getProfile, token } = useAuthStore();

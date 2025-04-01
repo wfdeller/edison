@@ -4,11 +4,16 @@ import useAuthStore from './authStore';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
-const useUserStore = create(set => ({
+const useUserStore = create((set, get) => ({
     users: [],
     loading: false,
     error: null,
-    totalUsers: 0,
+    dashboardStats: {
+        totalUsers: 0,
+        totalVideos: 0,
+        activeSessions: 0,
+        systemStatus: { status: 'healthy' },
+    },
 
     fetchUsers: async () => {
         const token = useAuthStore.getState().token;
@@ -30,6 +35,40 @@ const useUserStore = create(set => ({
         }
     },
 
+    fetchDashboardData: async () => {
+        const token = useAuthStore.getState().token;
+
+        set({ loading: true, error: null });
+        try {
+            const [usersResponse, videosResponse, systemResponse] = await Promise.all([
+                axios.get(`${API_URL}/api/users/count`, {
+                    headers: { Authorization: `Bearer ${token}` },
+                }),
+                axios.get(`${API_URL}/api/videos/count`, {
+                    headers: { Authorization: `Bearer ${token}` },
+                }),
+                axios.get(`${API_URL}/api/system/status`, {
+                    headers: { Authorization: `Bearer ${token}` },
+                }),
+            ]);
+
+            set({
+                dashboardStats: {
+                    totalUsers: usersResponse.data.count,
+                    totalVideos: videosResponse.data.count,
+                    systemStatus: systemResponse.data,
+                },
+                loading: false,
+            });
+        } catch (error) {
+            console.error('Error fetching dashboard data:', error);
+            set({
+                error: error.response?.data?.message || 'Failed to fetch dashboard data',
+                loading: false,
+            });
+        }
+    },
+
     fetchTotalUsersCount: async () => {
         const token = useAuthStore.getState().token;
         set({ loading: true, error: null });
@@ -38,34 +77,13 @@ const useUserStore = create(set => ({
                 headers: { Authorization: `Bearer ${token}` },
             });
 
-            console.log('User count response:', response.data);
-
-            if (!response.data) {
-                console.error('Response data is null or undefined');
-                throw new Error('Invalid response format: response data is missing');
-            }
-
-            if (typeof response.data.count !== 'number') {
-                console.error(
-                    'Count is not a number:',
-                    response.data.count,
-                    'Type:',
-                    typeof response.data.count
-                );
-                throw new Error(
-                    `Invalid response format: count is not a number (${typeof response.data.count})`
-                );
-            }
-
             set({
                 totalUsers: response.data.count,
                 loading: false,
             });
             return response.data.count;
         } catch (error) {
-            console.error('Error fetching user count:', error);
             console.error('Error response:', error.response?.data);
-
             set({
                 error: error.response?.data?.message || 'Failed to fetch total users count',
                 loading: false,
@@ -77,6 +95,7 @@ const useUserStore = create(set => ({
 
     updateUser: async (userId, userData) => {
         const token = useAuthStore.getState().token;
+
         set({ loading: true, error: null });
         try {
             const response = await axios.put(`${API_URL}/api/users/${userId}`, userData, {

@@ -1,7 +1,7 @@
 const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
-const config = require('../../config/config');
-const { ROLES, ALL_ROLES, isValidRole, areValidRoles } = require('../../constants/roles');
+const config = require('../config/config');
+const { ROLES, ALL_ROLES, isValidRole, areValidRoles } = require('../constants/roles');
 
 const userSchema = new mongoose.Schema(
     {

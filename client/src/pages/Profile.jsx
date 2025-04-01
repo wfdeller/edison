@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Card, Form, Input, Button, message, Spin, Row, Col, Tag, Divider } from 'antd';
 import {
     UserOutlined,
@@ -7,72 +7,53 @@ import {
     SaveOutlined,
     KeyOutlined,
 } from '@ant-design/icons';
-import axios from 'axios';
 import useAuthStore from '../stores/authStore';
 
 const Profile = () => {
     const [loading, setLoading] = useState(true);
-    const [form] = Form.useForm();
-    const formInitialized = useRef(false);
-    const { user, token } = useAuthStore();
-    const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+    const { user, token, getProfile, updateProfile, changePassword } = useAuthStore();
 
-    const fetchProfile = async () => {
-        try {
-            const response = await axios.get(`${API_URL}/api/auth/profile`, {
-                headers: { Authorization: `Bearer ${token}` },
-            });
-
-            if (formInitialized.current) {
-                form.setFieldsValue({
-                    name: response.data.name,
-                    email: response.data.email,
-                });
+    useEffect(() => {
+        const fetchProfileData = async () => {
+            try {
+                await getProfile();
+            } catch (error) {
+                console.error('Error fetching profile:', error);
+                message.error('Failed to load profile data');
+            } finally {
+                setLoading(false);
             }
-        } catch (error) {
-            console.error('Error fetching profile:', error);
-            message.error('Failed to load profile data');
-        } finally {
+        };
+
+        if (token) {
+            fetchProfileData();
+        } else {
             setLoading(false);
         }
-    };
-
-    useEffect(() => {
-        fetchProfile();
-    }, [token]);
-
-    useEffect(() => {
-        formInitialized.current = true;
-    }, []);
+    }, [token, getProfile]);
 
     const handleSubmit = async values => {
         try {
-            const { currentPassword, newPassword, ...profileData } = values;
-
-            // If password fields are filled, update password
-            if (currentPassword && newPassword) {
-                await axios.put(
-                    `${API_URL}/api/auth/password`,
-                    {
-                        currentPassword,
-                        newPassword,
-                    },
-                    {
-                        headers: { Authorization: `Bearer ${token}` },
-                    }
-                );
+            if (values.newPassword) {
+                await changePassword(values.currentPassword, values.newPassword);
+                message.success('Password updated successfully');
             }
 
-            // Update profile data
-            await axios.put(`${API_URL}/api/auth/profile`, profileData, {
-                headers: { Authorization: `Bearer ${token}` },
-            });
+            if (values.name !== user.name || values.email !== user.email) {
+                await updateProfile({
+                    name: values.name,
+                    email: values.email,
+                });
+                message.success('Profile updated successfully');
+            }
 
-            message.success('Profile updated successfully');
-            form.resetFields(['currentPassword', 'newPassword']);
+            // Reset password fields
+            const form = document.querySelector('form');
+            if (form) {
+                form.reset();
+            }
         } catch (error) {
-            console.error('Error updating profile:', error);
-            message.error(error.response?.data?.message || 'Failed to update profile');
+            message.error(error.message || 'Failed to update profile');
         }
     };
 
@@ -90,24 +71,48 @@ const Profile = () => {
                 <Row gutter={[24, 24]}>
                     <Col span={16}>
                         <Form
-                            form={form}
                             layout="vertical"
                             onFinish={handleSubmit}
                             initialValues={{
-                                name: user?.name,
-                                email: user?.email,
+                                name: user?.name || '',
+                                email: user?.email || '',
                             }}
                         >
+                            <Form.Item
+                                name="name"
+                                label="Name"
+                                rules={[{ required: true, message: 'Please input your name!' }]}
+                            >
+                                <Input prefix={<UserOutlined />} />
+                            </Form.Item>
+
+                            <Form.Item
+                                name="email"
+                                label="Email"
+                                rules={[
+                                    { required: true, message: 'Please input your email!' },
+                                    { type: 'email', message: 'Please enter a valid email!' },
+                                ]}
+                            >
+                                <Input prefix={<MailOutlined />} />
+                            </Form.Item>
+
                             <Divider orientation="left">Change Password</Divider>
 
                             <Form.Item
                                 name="currentPassword"
                                 label="Current Password"
                                 rules={[
-                                    {
-                                        required: form.getFieldValue('newPassword'),
-                                        message: 'Please input your current password!',
-                                    },
+                                    ({ getFieldValue }) => ({
+                                        validator(_, value) {
+                                            if (!value && getFieldValue('newPassword')) {
+                                                return Promise.reject(
+                                                    'Please input your current password!'
+                                                );
+                                            }
+                                            return Promise.resolve();
+                                        },
+                                    }),
                                 ]}
                             >
                                 <Input.Password
@@ -120,11 +125,21 @@ const Profile = () => {
                                 name="newPassword"
                                 label="New Password"
                                 rules={[
-                                    {
-                                        required: form.getFieldValue('currentPassword'),
-                                        message: 'Please input your new password!',
-                                    },
-                                    { min: 6, message: 'Password must be at least 6 characters!' },
+                                    ({ getFieldValue }) => ({
+                                        validator(_, value) {
+                                            if (!value && getFieldValue('currentPassword')) {
+                                                return Promise.reject(
+                                                    'Please input your new password!'
+                                                );
+                                            }
+                                            if (value && value.length < 6) {
+                                                return Promise.reject(
+                                                    'Password must be at least 6 characters!'
+                                                );
+                                            }
+                                            return Promise.resolve();
+                                        },
+                                    }),
                                 ]}
                             >
                                 <Input.Password
@@ -142,44 +157,28 @@ const Profile = () => {
                     </Col>
 
                     <Col span={8}>
-                        <Card title="Account Information" size="small">
+                        <Card title="Account Information">
                             <p>
-                                <strong>User ID:</strong> {user?.id}
+                                <strong>Name:</strong> {user?.name}
                             </p>
-                            {user?.roles?.length > 0 &&
-                                user.roles.some(role => role !== 'user') && (
-                                    <div
-                                        style={{
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            gap: '8px',
-                                            marginBottom: '8px',
-                                        }}
-                                    >
-                                        <strong>Roles:</strong>
-                                        <div>
-                                            {user.roles.map(role => (
-                                                <Tag
-                                                    key={role}
-                                                    color={role === 'admin' ? 'red' : 'blue'}
-                                                >
-                                                    {role}
-                                                </Tag>
-                                            ))}
-                                        </div>
-                                    </div>
+                            <p>
+                                <strong>Email:</strong> {user?.email}
+                            </p>
+                            <p>
+                                <strong>Roles:</strong>{' '}
+                                {user?.roles?.map(role => (
+                                    <Tag key={role} color="blue">
+                                        {role}
+                                    </Tag>
+                                ))}
+                            </p>
+                            <p>
+                                <strong>Email Verified:</strong>{' '}
+                                {user?.isEmailVerified ? (
+                                    <Tag color="success">Yes</Tag>
+                                ) : (
+                                    <Tag color="warning">No</Tag>
                                 )}
-                            <p>
-                                <strong>Member Since:</strong>{' '}
-                                {user?.createdAt
-                                    ? new Date(user.createdAt).toLocaleDateString()
-                                    : 'N/A'}
-                            </p>
-                            <p>
-                                <strong>Last Login:</strong>{' '}
-                                {user?.lastLogin
-                                    ? new Date(user.lastLogin).toLocaleString()
-                                    : 'Never'}
                             </p>
                         </Card>
                     </Col>

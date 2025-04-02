@@ -134,6 +134,27 @@ const useUserStore = create((set, get) => ({
             throw error;
         }
     },
+
+    createUser: async userData => {
+        const token = useAuthStore.getState().token;
+        set({ loading: true, error: null });
+        try {
+            const response = await axios.post(`${API_URL}/api/users`, userData, {
+                headers: { Authorization: `Bearer ${token}` },
+            });
+            set(state => ({
+                users: [...state.users, response.data],
+                loading: false,
+            }));
+            return response.data;
+        } catch (error) {
+            set({
+                error: error.response?.data?.message || 'Failed to create user',
+                loading: false,
+            });
+            throw error;
+        }
+    },
 }));
 
 export default useUserStore;

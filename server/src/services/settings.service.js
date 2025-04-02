@@ -2,7 +2,6 @@ const Settings = require('../models/Settings');
 
 const getSettings = async () => {
     try {
-        console.log('Fetching settings...');
         let settings = await Settings.find();
         console.log('Current settings:', settings);
 
